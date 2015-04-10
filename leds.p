@@ -22,41 +22,9 @@
 
 #define BIT_CLK     25
 
+#include "led_macros.p"
+
 .origin 0
-
-.macro StartClocks
-    mov     r0, 1 << 1 // set bit 1 in reg to enable clock
-    mov     r1, GPIO0_CLOCK
-    sbbo    r0, r1, 0, 4
-    mov     r1, GPIO1_CLOCK
-    sbbo    r0, r1, 0, 4
-    mov     r1, GPIO2_CLOCK
-    sbbo    r0, r1, 0, 4
-.endm
-
-.macro writeRow
-.mparam row
-    mov     r0.w0, r30.w0
-
-    // clear the lower 10 bits
-    ldi     r1.w0, 0xfc00
-    and     r0.w0, r0.w0, r1.w0
-
-    // set the lower 8
-    mov     r0.b0, row & 0xFF
-    // set 9 and 10
-    or      r0.b1, r0.b1, 0x3//(row >> 8) & 0x3
-
-    mov     r30.w0, r0.w0
-.endm
-
-.macro clockOut
-    mov     r0, 1<<25
-    mov     r1, GPIO2 | GPIO_CLEARDATAOUT
-    sbbo    r0, r1, 0, 4
-    mov     r1, GPIO2 | GPIO_SETDATAOUT
-    sbbo    r0, r1, 0, 4
-.endm
 
 start:
     // enable OCP master port
@@ -77,7 +45,16 @@ start:
     // unsuspend the GPIO clocks
     StartClocks
 
-    // test
+draw:
+    // rows
+
+    OutputEnableB
+    Delay   LONG_TIME
+    OutputDisableB
+    Delay   LONG_TIME
+    
+    // column
+
     jal     r25, col_reset
 
     LBCO    r0, CONST_DDR, 0, 12
