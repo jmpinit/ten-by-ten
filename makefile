@@ -19,7 +19,7 @@ DTBO_FILES := $(DTS_FILES:.dts=.dtbo)
 
 all:	leds.exe $(BIN_FILES) $(DTBO_FILES)
 
-main:	$(O_FILES)
+leds.exe:	$(O_FILES)
 	$(LD) -static -o $@ $(O_FILES) $(L_FLAGS) $(L_LIBS)
 	$(STRIP) $@
 
