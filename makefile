@@ -17,7 +17,7 @@ BIN_FILES := $(P_FILES:.p=.bin)
 O_FILES := $(C_FILES:.c=.o)
 DTBO_FILES := $(DTS_FILES:.dts=.dtbo)
 
-all:	main $(BIN_FILES) $(DTBO_FILES)
+all:	leds.exe $(BIN_FILES) $(DTBO_FILES)
 
 main:	$(O_FILES)
 	$(LD) -static -o $@ $(O_FILES) $(L_FLAGS) $(L_LIBS)
