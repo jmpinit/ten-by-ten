@@ -1,0 +1,136 @@
+/dts-v1/;
+/plugin/;
+
+/ {
+	compatible = "ti,beaglebone", "ti,beaglebone-black";
+
+	/* identification */
+	part-number = "ten_by_ten";
+	version = "00A0";
+
+	exclusive-use =
+	    /* pins */
+		"P8.25", "gpio1_0",     // LINE_A
+		"P8.24", "gpio1_1",     // LINE_A_RST
+        "P8.05", "gpio1_2",     // LINE_B
+        "P8.06", "gpio1_3",     // LINE_B_RST
+		"P8.30", "gpio2_25",    // LINE_CLK
+
+        "P8.12", "gpio1_12",    // R_LE
+        "P8.11", "gpio1_13",    // G_LE
+        "P8.16", "gpio1_14",    // B_LE
+
+        "P8.15", "gpio1_15",    // R_OE
+        "P8.21", "gpio1_30",    // G_OE
+        "P8.20", "gpio1_31",    // B_OE
+
+        "P8.45", "gpio2_6",     // D0
+        "P8.46", "gpio2_7",     // D1
+        "P8.43", "gpio2_8",     // D2
+        "P8.44", "gpio2_9",     // D3
+        "P8.41", "gpio2_10",    // D4
+        "P8.42", "gpio2_11",    // D5
+        "P8.39", "gpio2_12",    // D6
+        "P8.40", "gpio2_13",    // D7
+        "P8.27", "gpio2_22",    // D8
+        "P8.29", "gpio2_23",    // D9
+		/* hardware IP cores */
+		"pruss";
+
+	fragment@0 {
+		target = <&am33xx_pinmux>;
+		__overlay__ {
+			ten_by_ten_pins: pinmux_ten_by_ten_pins {
+				pinctrl-single,pins = <
+					0x000 0x07 // P8.25
+					0x004 0x07 // P8.24
+                    0x008 0x07 // P8.05
+                    0x00c 0x07 // P8.06
+					0x0ec 0x07 // P8.30
+
+                    0x030 0x06 // P8.12
+                    0x024 0x07 // P8.13
+                    0x028 0x07 // P8.14
+
+                    0x03c 0x07 // P8.15
+                    0x080 0x05 // P8.21
+                    0x084 0x05 // P8.20
+
+                    0x0a0 0x05 // P8.45 D0
+                    0x0a4 0x05 // P8.46 D1
+                    0x0a8 0x05 // P8.43 D2
+                    0x0ac 0x05 // P8.44 D3
+                    0x0b0 0x05 // P8.41 D4
+                    0x0b4 0x05 // P8.42 D5
+                    0x0b8 0x05 // P8.39 D6
+                    0x0bc 0x05 // P8.40 D7
+                    0x0e0 0x05 // P8.27 D8
+                    0x0e4 0x05 // P8.29 D9
+                >;
+            };
+        };
+    };
+
+ 	fragment@1 {
+  		target = <&pruss>;
+		__overlay__ {
+            status = "okay";
+            pinctrl-names = "default";
+            pinctrl-0 = <&ten_by_ten_pins>;
+
+            shift_a {
+                pin-names = "tbt:pru-line_a", "tbt:pru-line_a_rst";
+                gpios = <&gpio2 0 0
+                         &gpio2 1 0>;
+            };
+
+            shift_b {
+                pin-names = "tbt:pru-line_b", "tbt:pru-line_b_rst";
+                gpios = <&gpio2 2 0
+                         &gpio2 3 0>;
+            };
+
+            shift_clk {
+                pin-names = "tbt:pru-shift_clk";
+                gpios = <&gpio3 25 0>;
+            };
+
+            latch_en {
+                pin-names = "tbt:pru-r_le", "tbt:pru-g_le", "tbt:pru-b_le";
+                gpios = <&gpio2 12 0
+                         &gpio2 13 0
+                         &gpio2 14 0>;
+            };
+
+            output_en {
+                pin-names = "tbt:pru-r_oe", "tbt:pru-g_oe", "tbt:pru-b_oe";
+                gpios = <&gpio2 15 0
+                         &gpio2 30 0
+                         &gpio2 31 0>;
+            };
+
+            data {
+                pin-names = "tbt:pru-d0",
+                            "tbt:pru-d1", 
+                            "tbt:pru-d2", 
+                            "tbt:pru-d3", 
+                            "tbt:pru-d4", 
+                            "tbt:pru-d5", 
+                            "tbt:pru-d6", 
+                            "tbt:pru-d7", 
+                            "tbt:pru-d8", 
+                            "tbt:pru-d9";
+                gpios = <&gpio3 6 0
+                         &gpio3 7 0
+                         &gpio3 8 0
+                         &gpio3 9 0
+                         &gpio3 10 0
+                         &gpio3 11 0
+                         &gpio3 12 0
+                         &gpio3 13 0
+                         &gpio3 22 0
+                         &gpio3 23 0>;
+            };
+        };
+    };
+};
