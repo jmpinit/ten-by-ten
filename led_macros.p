@@ -35,27 +35,27 @@ delay_loop:
 // LEs
 
 .macro LatchEnableR
-    IOHigh  GPIO1, BIT_R_LE
-.endm
-
-.macro LatchDisableR
     IOLow   GPIO1, BIT_R_LE
 .endm
 
-.macro LatchEnableG
-    IOHigh  GPIO1, BIT_G_LE
+.macro LatchDisableR
+    IOHigh  GPIO1, BIT_R_LE
 .endm
 
-.macro LatchDisableG
+.macro LatchEnableG
     IOLow   GPIO1, BIT_G_LE
 .endm
 
+.macro LatchDisableG
+    IOHigh  GPIO1, BIT_G_LE
+.endm
+
 .macro LatchEnableB
-    IOHigh  GPIO1, BIT_B_LE
+    IOLow   GPIO1, BIT_B_LE
 .endm
 
 .macro LatchDisableB
-    IOLow   GPIO1, BIT_B_LE
+    IOHigh  GPIO1, BIT_B_LE
 .endm
 
 // OEs (active low)
