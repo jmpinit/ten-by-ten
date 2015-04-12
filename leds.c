@@ -132,17 +132,24 @@ int main (int argc, char* argv[]) {
     // overwrite image with test pattern
     uint32_t* formattedImage = (uint32_t*)calloc(10*10, sizeof(uint32_t));
 
+    int arg2 = atoi(argv[2]);
     for (int x = 0; x < 10; x++) {
         for (int y = 0; y < 10; y++) {
-            int offset = y * 10 + x;
+            int srcOffset = (9-x) * 10 + y;
+            int destOffset = (9-y) * 10 + x;
 
-            uint8_t r = 0xff;//offset % 2;//image[offset * 3];
-            uint8_t g = 0xff;//image[offset * 3 + 1];
-            uint8_t b = 0xff;//image[offset * 3 + 2];
+            uint8_t r = image[srcOffset * 3];
+            uint8_t g = image[srcOffset * 3 + 1];
+            uint8_t b = image[srcOffset * 3 + 2];
 
-            formattedImage[offset] = (r << 16) | (g << 8) | b;
+            formattedImage[destOffset] = (r << 16) | (g << 8) | b;
         }
     }
+
+    for (int i = 0; i < 32; i++) {
+        printf("%x, ", formattedImage[i]);
+    }
+    printf("\n");
 
     // FIXME arg hack
     if (argc == 3) {
@@ -157,7 +164,7 @@ int main (int argc, char* argv[]) {
     prussdrv_exec_program(PRU_NUM, "./leds.bin");
 
     printf("program running.\n");
-    sleep(2);
+    getchar();
     printf("sending kill signal.\n");
     ((uint8_t*)ddrMem)[3] = 0xff;
 
@@ -168,6 +175,10 @@ int main (int argc, char* argv[]) {
     // disable pru
     prussdrv_pru_disable(PRU_NUM);
     prussdrv_exit ();
+
+    // FIXME
+    // print return val
+    printf("PRU returned %x\n", ((uint32_t*)ddrMem)[0]);
 
     // undo memory mapping
     munmap(ddrMem, 0x0FFFFFFF);
