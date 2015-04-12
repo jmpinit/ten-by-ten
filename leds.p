@@ -9,8 +9,10 @@
 #define OWN_RAM     0x000
 #define OTHER_RAM   0x020
 #define SHARED_RAM  0x100
-#define DDR_RAM     0xc0000000
 #define DDR_OFFSET  0
+
+#define ADDR_SHARED_RAM 0x80000000
+#define ADDR_DDR_RAM    0xc0000000
 
 #define GPIO0_CLOCK 0x44e00408
 #define GPIO1_CLOCK 0x44e000ac
@@ -77,23 +79,55 @@ start:
     LatchDisableG
     LatchDisableB
 
+    // FIXME
+    mov     r5, 0
+copy_frame:
+    ldi     r0.w0, ADDR_DDR_RAM & 0xFFFF
+    ldi     r0.w1, ADDR_DDR_RAM >> 16
+
+    ldi     r1.w0, ADDR_SHARED_RAM & 0xFFFF
+    ldi     r1.w1, ADDR_SHARED_RAM >> 16
+
+    ldi     r2, NUM_ROWS * NUM_COLUMNS * 4 / (16 * 4)
+copy_frame_loop: 
+    // copy some bytes to shared RAM
+    lbbo    r8, r0, 0, 16 * 4
+    sbbo    r8, r1, 0, 16 * 4
+
+    add     r0, r0, 16 * 4
+    add     r1, r1, 16 * 4
+
+    dec     r2
+    qbne    copy_frame_loop, r2, 0
+
+    // FIXME
+    inc     r5
+
+    // check for kill signal
+    lbco    r0, CONST_DDR, 0, 4
+    qbne    die, r0.b3, 0
+
+    jmp     copy_frame
+
 next_frame:
     mov     rPixelCount, 0
     mov     rColCount, 0
     
 next_column:
+    LatchDisableR
     LatchDisableG
+    LatchDisableB
 
     mov     rRowCount, 0
 pixel_write:
     // calculate byte offset
     lsl     r0, rPixelCount, 2 // multiply by 4
 
-    mov     r1, DDR_RAM
+    mov     r1, ADDR_DDR_RAM
     add     r0, r0, r1
     lbbo    rPixel, r0, 0, 4
     
-    qbbs    pixel_write_0, rPixel.b2, 7 // threshold red value at 50%
+    qbbs    pixel_write_0, rPixel.b2, 7
 pixel_write_1:
     set     r30, rRowCount
     jmp     pixel_write_done
@@ -110,8 +144,13 @@ column_done:
     call    col_enable
 
     // enable outputs
+    LatchEnableR
     LatchEnableG
+    LatchEnableB
+
+    OutputEnableR
     OutputEnableG
+    OutputEnableB
 
     // check for kill signal
     lbco    r0, CONST_DDR, 0, 4
@@ -129,6 +168,11 @@ column_done:
 die:
     // leds off
     ColumnReset
+
+    // FIXME
+    // save return val
+    mov     r0, ADDR_DDR_RAM
+    sbbo    r5, r0, 0, 4
     
     // notify host program of finish
     mov     r31.b0, PRU0_ARM_INTERRUPT + 16

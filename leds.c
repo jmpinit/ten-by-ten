@@ -163,8 +163,16 @@ int main (int argc, char* argv[]) {
     // load and execute PRU program
     prussdrv_exec_program(PRU_NUM, "./leds.bin");
 
+    struct timeval tv;
+    gettimeofday(&tv, NULL);
+    unsigned long startTime = 1000000 * tv.tv_sec + tv.tv_usec;
+
     printf("program running.\n");
     getchar();
+
+    gettimeofday(&tv, NULL);
+    unsigned long endTime = 1000000 * tv.tv_sec + tv.tv_usec;
+
     printf("sending kill signal.\n");
     ((uint8_t*)ddrMem)[3] = 0xff;
 
@@ -178,7 +186,9 @@ int main (int argc, char* argv[]) {
 
     // FIXME
     // print return val
-    printf("PRU returned %x\n", ((uint32_t*)ddrMem)[0]);
+    uint32_t returnVal = ((uint32_t*)ddrMem)[0];
+    printf("PRU returned %x\n", returnVal);
+    printf("%d frame copies in %d microseconds is a rate of %f frames per second.\n", returnVal, endTime - startTime, (float)returnVal / (float)(endTime - startTime) * 1000000.0f);
 
     // undo memory mapping
     munmap(ddrMem, 0x0FFFFFFF);
