@@ -115,7 +115,7 @@ int main (int argc, char* argv[]) {
 
     // load an image
     
-    if (argc != 2) {
+    if (!(argc == 2 || argc == 3)) {
         printf("usage: leds.exe <10x10 RGB ppm image>");
         exit(1);
     }
@@ -128,10 +128,38 @@ int main (int argc, char* argv[]) {
         exit(1);
     }
 
-    memcpy(ddrMem, image, 300);
+    // FIXME just a test...
+    // overwrite image with test pattern
+    uint32_t* formattedImage = (uint32_t*)calloc(10*10, sizeof(uint32_t));
+
+    for (int x = 0; x < 10; x++) {
+        for (int y = 0; y < 10; y++) {
+            int offset = y * 10 + x;
+
+            uint8_t r = 0xff;//offset % 2;//image[offset * 3];
+            uint8_t g = 0xff;//image[offset * 3 + 1];
+            uint8_t b = 0xff;//image[offset * 3 + 2];
+
+            formattedImage[offset] = (r << 16) | (g << 8) | b;
+        }
+    }
+
+    // FIXME arg hack
+    if (argc == 3) {
+        uint32_t arg = (atoi(argv[2]) & 0xFF) << 24;
+        formattedImage[1] |= arg;
+        printf("[1] is now %x\n", formattedImage[1]);
+    }
+
+    memcpy(ddrMem, formattedImage, 10*10*sizeof(uint32_t));
 
     // load and execute PRU program
     prussdrv_exec_program(PRU_NUM, "./leds.bin");
+
+    printf("program running.\n");
+    sleep(2);
+    printf("sending kill signal.\n");
+    ((uint8_t*)ddrMem)[3] = 0xff;
 
     printf("waiting on PRU...\n");
     prussdrv_pru_wait_event(PRU_EVTOUT_0);

@@ -22,7 +22,19 @@
 
 #define BIT_CLK     25
 
+#define NUM_COLUMNS 10
+#define NUM_ROWS    10
+
+#define RET_REG     r28.w0
+
+#define rRowCount   r8
+#define rColCount   r9
+#define rPixelCount r10
+#define rPixel      r11
+
 #include "led_macros.p"
+
+.setcallreg RET_REG
 
 .origin 0
 
@@ -45,62 +57,140 @@ start:
     // unsuspend the GPIO clocks
     StartClocks
 
-draw:
-    // rows
+    // latch clock high
+    ClockInit
 
-    OutputEnableB
-    Delay   LONG_TIME
+    OutputDisableR
+    OutputDisableG
     OutputDisableB
-    Delay   LONG_TIME
+
+    LatchDisableR
+    LatchDisableG
+    LatchDisableB
+
+draw_frame:
+    mov     rPixelCount, 0
+    mov     rColCount, 0
     
-    // column
+column_out:
+    jmp     column_done // FIXME
+    LatchDisableR
 
-    jal     r25, col_reset
+    mov     rRowCount, 0
+pixel_write:
+    mov     r0, rPixelCount
+       
+    // calculate byte offset
+    lsl     r0, r0, 2 // multiply by 4
+    add     r0, r0, 2 // red channel
+    lbco    rPixel, CONST_DDR, r0, 1
 
-    LBCO    r0, CONST_DDR, 0, 12
+    qba     pixel_write_0 // FIXME
+    //qbbs    pixel_write_0, rPixel, 7 // threshold 8 bit color value at 50%
+pixel_write_1:
+    set     r30, rRowCount
+    jmp     pixel_write_done
+pixel_write_0:
+    clr     r30, rRowCount
+pixel_write_done:
+    inc     rRowCount
+    qblt    pixel_write, rRowCount, NUM_ROWS
+
+column_done:
+    // drive the column
+    lbco    r0, CONST_DDR, 4, 4
+    mov     r0.b0, r0.b3
+    and     r0, r0, 0xff
+    call    col_enable
+
+    LatchDisableR
+    OutputDisableR
+
+    clr     r30.t0
+    clr     r30.t1
+    clr     r30.t2
+    clr     r30.t3
+    clr     r30.t4
+    clr     r30.t5
+    clr     r30.t6
+    clr     r30.t7
+    clr     r30.t8
+    clr     r30.t9
+
+    // enable outputs
+    LatchEnableR
+    OutputEnableR
+
+    inc     rPixelCount
+
+    // check for end of frame
+    inc     rColCount
+    qblt    column_out, rColCount, NUM_COLUMNS
+
+    // check for kill signal
     lbco    r0, CONST_DDR, 0, 4
-    jal     r25, col_write
+    qbne    die, r0.b3, 0
+    
+    jmp     draw_frame
 
+die:
     // notify host program of finish
     mov     r31.b0, PRU0_ARM_INTERRUPT + 16
     halt
 
-col_reset:
-    mov     r1, GPIO1 | GPIO_CLEARDATAOUT
-    mov     r0, 1 << BIT_A_RST
-    sbbo    r0, r1, 0, 4
-    mov     r0, 1 << BIT_B_RST
-    sbbo    r0, r1, 0, 4
-
-    mov     r1, GPIO1 | GPIO_SETDATAOUT
-    mov     r0, 1 << BIT_A_RST
-    sbbo    r0, r1, 0, 4
-    mov     r0, 1 << BIT_B_RST
-    sbbo    r0, r1, 0, 4
-
-    jmp     r25
-
-col_write:
-    mov     r2, r0
-    mov     r3, 0
-
-col_write_next:
-    qbbs    col_write_1, r2, 0
+// ********************
+col_enable:
+    // save column to enable
+    mov     r7, r0
     
-col_write_0:
-    mov     r1, GPIO1 | GPIO_CLEARDATAOUT
-    qba     col_write_done
-col_write_1:
-    mov     r1, GPIO1 | GPIO_SETDATAOUT
-col_write_done:
-    // clock out bit
-    mov     r0, 1<<BIT_A
-    sbbo    r0, r1, 0, 4
-    clockOut
+    // call    col_reset FIXME
 
-    lsr     r2, r2, 1   // next bit
-    add     r3, r3, 1   // count bits
+    IOLow   GPIO1, BIT_A
+    IOLow   GPIO1, BIT_B
 
-    qbne    col_write_next, r3, 8
+    IOLow   GPIO1, BIT_A_RST
+    IOLow   GPIO1, BIT_B_RST
 
-    jmp     r25
+    IOHigh  GPIO1, BIT_A_RST
+    IOHigh  GPIO1, BIT_B_RST
+
+    qblt    col_enable_big, r7, 7
+
+col_enable_small:
+col_enable_write_small_1:
+    IOHigh  GPIO1, BIT_A
+    ClockOut
+    qbeq    col_enable_write_small_done, r7, 0
+
+    IOLow   GPIO1, BIT_A
+col_enable_write_small_0:
+    ClockOut
+    dec     r7
+    qbne    col_enable_write_small_0, r7, 0
+col_enable_write_small_done:
+    ret
+    
+col_enable_big:
+    sub     r7, r7, 8
+col_enable_write_big_1:
+    IOHigh  GPIO1, BIT_B
+    ClockOut
+    qbeq    col_enable_write_big_done, r7, 0
+
+    IOLow   GPIO1, BIT_B
+col_enable_write_big_0:
+    ClockOut
+    dec     r7
+    qbne    col_enable_write_big_0, r7, 0
+col_enable_write_big_done:
+    ret
+
+// ********************
+col_reset:
+    IOLow   GPIO1, BIT_A_RST
+    IOLow   GPIO1, BIT_B_RST
+
+    IOHigh  GPIO1, BIT_A_RST
+    IOHigh  GPIO1, BIT_B_RST
+
+    ret

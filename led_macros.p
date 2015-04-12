@@ -8,6 +8,16 @@
 
 #define LONG_TIME       0xf00000
 
+.macro inc
+.mparam reg
+    add     reg, reg, 1
+.endm
+
+.macro dec
+.mparam reg
+    sub     reg, reg, 1
+.endm
+
 .macro Delay
 .mparam len
     mov     r0, len
@@ -110,10 +120,17 @@ delay_loop:
     mov     r30.w0, r0.w0
 .endm
 
-.macro clockOut
-    mov     r0, 1<<25
-    mov     r1, GPIO2 | GPIO_CLEARDATAOUT
-    sbbo    r0, r1, 0, 4
-    mov     r1, GPIO2 | GPIO_SETDATAOUT
-    sbbo    r0, r1, 0, 4
+.macro ClockInit
+    IOHigh  GPIO2, 25
+.endm
+
+.macro ClockOut
+    IOLow   GPIO2, 25
+    IOHigh  GPIO2, 25
+    
+    //mov     r0, 1 << 25
+    //mov     r1, GPIO2 | GPIO_CLEARDATAOUT
+    //sbbo    r0, r1, 0, 4
+    //mov     r1, GPIO2 | GPIO_SETDATAOUT
+    //sbbo    r0, r1, 0, 4
 .endm
