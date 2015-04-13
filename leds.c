@@ -80,8 +80,22 @@ uint8_t* leds_from_ppm(FILE *pf) {
 
     return image;
 }
+
+void setLevel(uint32_t* mem, uint8_t level) {
+    for (int x = 0; x < 10; x++) {
+        for (int y = 0; y < 10; y++) {
+            int offset = y * 10 + x;
+
+            uint8_t r = level;
+            uint8_t g = level;
+            uint8_t b = level;
+
+            mem[offset] = (r << 16) | (g << 8) | b;
+        }
+    }
+}
     
-int main (int argc, char* argv[]) {
+int main(int argc, char* argv[]) {
     tpruss_intc_initdata pruss_intc_initdata = PRUSS_INTC_INITDATA;
 
     // init pru driver
@@ -138,9 +152,10 @@ int main (int argc, char* argv[]) {
             int srcOffset = (9-x) * 10 + y;
             int destOffset = (9-y) * 10 + x;
 
-            uint8_t r = image[srcOffset * 3];
-            uint8_t g = image[srcOffset * 3 + 1];
-            uint8_t b = image[srcOffset * 3 + 2];
+            uint8_t v = arg2;//255 - y * (255/9);
+            uint8_t r = v;//image[srcOffset * 3];
+            uint8_t g = v;//image[srcOffset * 3 + 1];
+            uint8_t b = v;//image[srcOffset * 3 + 2];
 
             formattedImage[destOffset] = (r << 16) | (g << 8) | b;
         }
@@ -163,15 +178,9 @@ int main (int argc, char* argv[]) {
     // load and execute PRU program
     prussdrv_exec_program(PRU_NUM, "./leds.bin");
 
-    struct timeval tv;
-    gettimeofday(&tv, NULL);
-    unsigned long startTime = 1000000 * tv.tv_sec + tv.tv_usec;
-
     printf("program running.\n");
+    
     getchar();
-
-    gettimeofday(&tv, NULL);
-    unsigned long endTime = 1000000 * tv.tv_sec + tv.tv_usec;
 
     printf("sending kill signal.\n");
     ((uint8_t*)ddrMem)[3] = 0xff;
@@ -188,7 +197,6 @@ int main (int argc, char* argv[]) {
     // print return val
     uint32_t returnVal = ((uint32_t*)ddrMem)[0];
     printf("PRU returned %x\n", returnVal);
-    printf("%d frame copies in %d microseconds is a rate of %f frames per second.\n", returnVal, endTime - startTime, (float)returnVal / (float)(endTime - startTime) * 1000000.0f);
 
     // undo memory mapping
     munmap(ddrMem, 0x0FFFFFFF);
@@ -198,3 +206,4 @@ int main (int argc, char* argv[]) {
 
     return(0);
 }
+

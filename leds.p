@@ -29,7 +29,7 @@
 
 #define NUM_COLUMNS 10
 #define NUM_ROWS    10
-#define COLOR_DEPTH 1
+#define COLOR_DEPTH 4
 
 #define RET_REG     r28.w0
 
@@ -38,15 +38,15 @@
 #define rPixelCount r10
 #define rPixel      r11
 #define rSlicesLeft r12
-#define rAddrTiming r26 // needs to be >24 to survive image copy
+#define rAddrTiming r13
 
 #include "led_macros.p"
 
 .macro ColumnReset
     IOLow   GPIO1, BIT_A_RST
-    IOLow   GPIO1, BIT_B_RST
-
     IOHigh  GPIO1, BIT_A_RST
+
+    IOLow   GPIO1, BIT_B_RST
     IOHigh  GPIO1, BIT_B_RST
 .endm
 
@@ -76,39 +76,19 @@ start:
     // latch clock high
     ClockInit
 
-    OutputDisableR
-    OutputDisableG
-    OutputDisableB
+    OutputEnableR
+    //OutputEnableG
+    //OutputEnableB
 
     LatchDisableR
     LatchDisableG
     LatchDisableB
 
     mov     rAddrTiming, ADDR_DDR_RAM
-    mov     r0, NUM_ROWS * NUM_COLUMNS * 4
-    add     rAddrTiming, rAddrTiming, r0
 
-copy_image:
-    mov     r0, ADDR_DDR_RAM
-    mov     r1, rAddrTiming
-
-    mov     r2, NUM_ROWS * NUM_COLUMNS * 4 / (16 * 4)
-copy_image_loop: 
-    // copy some bytes to shared RAM
-    lbbo    r8, r0, 0, 16 * 4
-    sbbo    r8, r1, 0, 16 * 4
-
-    // move to next chunk
-    add     r0, r0, 16 * 4
-    add     r1, r1, 16 * 4
-
-    // count down by one
-    dec     r2
-    qbne    copy_image_loop, r2, 0
-
-display_frame:
+next_frame:
+    set     r30, 10 // debug
     mov     rSlicesLeft, 1 << COLOR_DEPTH
-    set     r30, 10 // debug - indicate start
 next_slice:
     mov     rPixelCount, 0
     mov     rColCount, 0
@@ -117,14 +97,6 @@ next_column:
     // drive column
     mov     r0, rColCount
     call    col_enable
-
-    OutputDisableR
-    OutputDisableG
-    OutputDisableB
-
-    LatchDisableR
-    LatchDisableG
-    LatchDisableB
 
     mov     rRowCount, 0
 next_pixel:
@@ -138,41 +110,15 @@ next_pixel:
     lbbo    rPixel, r0, 0, 4
     
 pixel_red:
-    qbeq    pixel_red_off, rPixel.b2, 0 // finished being on?
+    qbgt    pixel_red_off, rPixel.b2, rSlicesLeft // finished being on?
     clr     r30, rRowCount // LED on
-    dec     rPixel.b2 // one less time slice of being on
-    jmp     pixel_green
+    jmp     pixel_done
 pixel_red_off:
     set     r30, rRowCount // LED off
 
-pixel_green:
-    LatchEnableR
-    OutputEnableR
-
-    qbeq    pixel_green_off, rPixel.b1, 0 // finished being on?
-    clr     r30, rRowCount // LED on
-    dec     rPixel.b1 // one less time slice of being on
-    jmp     pixel_blue
-pixel_green_off:
-    set     r30, rRowCount // LED off
-
-pixel_blue:
-    LatchEnableG
-    //OutputEnableG
-
-    qbne    pixel_blue_off, rPixel.b0, 0 // finished being on?
-    clr     r30, rRowCount // LED on
-    dec     rPixel.b0 // one less time slice of being on
-    jmp     pixel_done
-pixel_blue_off:
-    set     r30, rRowCount // LED off
-
 pixel_done:
-    LatchEnableB
-    OutputEnableB
-
-    // save the decremented counts
-    sbbo    rPixel, r0, 0, 4
+    LatchDisableR
+    LatchEnableR
 
     // move to the next
     inc     rRowCount
@@ -189,21 +135,20 @@ column_done:
     inc     rColCount
     qbne    next_column, rColCount, NUM_COLUMNS
 
-    // FIXME
-    Delay   LONG_TIME / 1024
+    clr     r30, 10 // debug
 
+    // check for end of frame
     dec     rSlicesLeft
     qbne    next_slice, rSlicesLeft, 0
 
-    clr     r30, 10 // debug - indicate end
-
-    // FIXME
-    //Delay   LONG_TIME / 256
-
-    jmp     copy_image
+    jmp     next_frame
 
 die:
     // leds off
+    OutputDisableR
+    OutputDisableG
+    OutputDisableB
+
     ColumnReset
 
     // FIXME
