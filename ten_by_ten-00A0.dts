@@ -34,6 +34,9 @@
         "P8.40", "gpio2_13",    // D7
         "P8.27", "gpio2_22",    // D8
         "P8.29", "gpio2_23",    // D9
+
+        "P8.28", "gpio2_24",    // debug line
+
 		/* hardware IP cores */
 		"pruss";
 
@@ -66,6 +69,8 @@
                     0x0bc 0x05 // P8.40 D7
                     0x0e0 0x05 // P8.27 D8
                     0x0e4 0x05 // P8.29 D9
+
+                    0x0e8 0x05 // P8.28 debug
                 >;
             };
         };
@@ -77,6 +82,11 @@
             status = "okay";
             pinctrl-names = "default";
             pinctrl-0 = <&ten_by_ten_pins>;
+
+            debug {
+                pin-names = "tbt:pru-debug";
+                gpios = <&gpio3 24 0>;
+            };
 
             shift_a {
                 pin-names = "tbt:pru-line_a", "tbt:pru-line_a_rst";
