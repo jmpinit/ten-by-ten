@@ -126,6 +126,8 @@ pixel_done:
 
     qbne    next_pixel, rRowCount, NUM_ROWS
 
+    Delay   LONG_TIME / 1024
+
 column_done:
     // check for kill signal
     lbco    r0, CONST_DDR, 0, 4
@@ -136,6 +138,8 @@ column_done:
     qbne    next_column, rColCount, NUM_COLUMNS
 
     clr     r30, 10 // debug
+
+    ColumnReset
 
     // check for end of frame
     dec     rSlicesLeft
