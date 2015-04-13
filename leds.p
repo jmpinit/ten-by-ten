@@ -13,6 +13,8 @@
 
 #define ADDR_SHARED_RAM 0x80000000
 #define ADDR_DDR_RAM    0xc0000000
+#define ADDR_DDR_RAM_L  0x0000
+#define ADDR_DDR_RAM_H  0xc000
 
 #define GPIO0_CLOCK 0x44e00408
 #define GPIO1_CLOCK 0x44e000ac
@@ -27,6 +29,7 @@
 
 #define NUM_COLUMNS 10
 #define NUM_ROWS    10
+#define COLOR_DEPTH 1
 
 #define RET_REG     r28.w0
 
@@ -34,6 +37,8 @@
 #define rColCount   r9
 #define rPixelCount r10
 #define rPixel      r11
+#define rSlicesLeft r12
+#define rAddrTiming r26 // needs to be >24 to survive image copy
 
 #include "led_macros.p"
 
@@ -79,91 +84,123 @@ start:
     LatchDisableG
     LatchDisableB
 
-    // FIXME
-    mov     r5, 0
-copy_frame:
-    ldi     r0.w0, ADDR_DDR_RAM & 0xFFFF
-    ldi     r0.w1, ADDR_DDR_RAM >> 16
+    mov     rAddrTiming, ADDR_DDR_RAM
+    mov     r0, NUM_ROWS * NUM_COLUMNS * 4
+    add     rAddrTiming, rAddrTiming, r0
 
-    ldi     r1.w0, ADDR_SHARED_RAM & 0xFFFF
-    ldi     r1.w1, ADDR_SHARED_RAM >> 16
+copy_image:
+    mov     r0, ADDR_DDR_RAM
+    mov     r1, rAddrTiming
 
-    ldi     r2, NUM_ROWS * NUM_COLUMNS * 4 / (16 * 4)
-copy_frame_loop: 
+    mov     r2, NUM_ROWS * NUM_COLUMNS * 4 / (16 * 4)
+copy_image_loop: 
     // copy some bytes to shared RAM
     lbbo    r8, r0, 0, 16 * 4
     sbbo    r8, r1, 0, 16 * 4
 
+    // move to next chunk
     add     r0, r0, 16 * 4
     add     r1, r1, 16 * 4
 
+    // count down by one
     dec     r2
-    qbne    copy_frame_loop, r2, 0
+    qbne    copy_image_loop, r2, 0
 
-    // FIXME
-    inc     r5
-
-    // check for kill signal
-    lbco    r0, CONST_DDR, 0, 4
-    qbne    die, r0.b3, 0
-
-    jmp     copy_frame
-
-next_frame:
+display_frame:
+    mov     rSlicesLeft, 1 << COLOR_DEPTH
+    set     r30, 10 // debug - indicate start
+next_slice:
     mov     rPixelCount, 0
     mov     rColCount, 0
     
 next_column:
+    // drive column
+    mov     r0, rColCount
+    call    col_enable
+
+    OutputDisableR
+    OutputDisableG
+    OutputDisableB
+
     LatchDisableR
     LatchDisableG
     LatchDisableB
 
     mov     rRowCount, 0
-pixel_write:
+next_pixel:
+    // load the pixel data
+
     // calculate byte offset
     lsl     r0, rPixelCount, 2 // multiply by 4
+    add     r0, r0, rAddrTiming
 
-    mov     r1, ADDR_DDR_RAM
-    add     r0, r0, r1
+    // load it
     lbbo    rPixel, r0, 0, 4
     
-    qbbs    pixel_write_0, rPixel.b2, 7
-pixel_write_1:
-    set     r30, rRowCount
-    jmp     pixel_write_done
-pixel_write_0:
-    clr     r30, rRowCount
-pixel_write_done:
-    inc     rRowCount
-    inc     rPixelCount
-    qbne    pixel_write, rRowCount, NUM_ROWS
+pixel_red:
+    qbeq    pixel_red_off, rPixel.b2, 0 // finished being on?
+    clr     r30, rRowCount // LED on
+    dec     rPixel.b2 // one less time slice of being on
+    jmp     pixel_green
+pixel_red_off:
+    set     r30, rRowCount // LED off
 
-column_done:
-    // drive column
-    mov     r0, rColCount
-    call    col_enable
-
-    // enable outputs
+pixel_green:
     LatchEnableR
-    LatchEnableG
-    LatchEnableB
-
     OutputEnableR
-    OutputEnableG
+
+    qbeq    pixel_green_off, rPixel.b1, 0 // finished being on?
+    clr     r30, rRowCount // LED on
+    dec     rPixel.b1 // one less time slice of being on
+    jmp     pixel_blue
+pixel_green_off:
+    set     r30, rRowCount // LED off
+
+pixel_blue:
+    LatchEnableG
+    //OutputEnableG
+
+    qbne    pixel_blue_off, rPixel.b0, 0 // finished being on?
+    clr     r30, rRowCount // LED on
+    dec     rPixel.b0 // one less time slice of being on
+    jmp     pixel_done
+pixel_blue_off:
+    set     r30, rRowCount // LED off
+
+pixel_done:
+    LatchEnableB
     OutputEnableB
 
+    // save the decremented counts
+    sbbo    rPixel, r0, 0, 4
+
+    // move to the next
+    inc     rRowCount
+    inc     rPixelCount
+
+    qbne    next_pixel, rRowCount, NUM_ROWS
+
+column_done:
     // check for kill signal
     lbco    r0, CONST_DDR, 0, 4
     qbne    die, r0.b3, 0
 
-    // FIXME
-    Delay   LONG_TIME / 256
-    
-    // check for end of frame
+    // check for end of slice
     inc     rColCount
     qbne    next_column, rColCount, NUM_COLUMNS
 
-    jmp     next_frame
+    // FIXME
+    Delay   LONG_TIME / 1024
+
+    dec     rSlicesLeft
+    qbne    next_slice, rSlicesLeft, 0
+
+    clr     r30, 10 // debug - indicate end
+
+    // FIXME
+    //Delay   LONG_TIME / 256
+
+    jmp     copy_image
 
 die:
     // leds off
@@ -171,6 +208,9 @@ die:
 
     // FIXME
     // save return val
+    mov     r0, ADDR_DDR_RAM
+    mov     r5, r0
+
     mov     r0, ADDR_DDR_RAM
     sbbo    r5, r0, 0, 4
     
